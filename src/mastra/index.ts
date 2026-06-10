@@ -151,7 +151,9 @@ export const mastra = new Mastra({
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             return c.html(
-              `<h1>OAuth Error</h1><p>Failed to start OAuth flow: ${message}</p>`,
+              '<h1>Slack OAuth Error</h1>' +
+              `<p>Could not start the OAuth flow: ${message}</p>` +
+              '<p>Check that <code>SLACK_CLIENT_ID</code> and <code>SLACK_CLIENT_SECRET</code> are set in your environment.</p>',
               500,
             );
           }
@@ -172,15 +174,18 @@ export const mastra = new Mastra({
 
           const result = await completeOAuth(code);
           if (result === "AUTHORIZED" && (await hasSlackTokens())) {
-            // Tokens saved — create MCPServer so transport endpoint works.
-            // The user needs to restart the server for the new MCPServer to register,
-            // since Mastra's mcpServers is set at construction time.
             return c.html(
-              '<h1>OAuth Complete</h1><p>Slack MCP connected. Tools are now available in Studio.</p>',
+              '<h1>Slack OAuth Complete</h1>' +
+              '<p>Slack access tokens have been saved to persistent storage.</p>' +
+              '<p><strong>You must restart this server for Slack tools to become available.</strong> ' +
+              'No documented method adds or refreshes tools on a running MCPServer or MCPClient instance.</p>' +
+              '<p>After restarting, Slack tools will appear in Studio.</p>',
             );
           }
           return c.html(
-            '<h1>OAuth Failed</h1><p>Could not exchange code for tokens. Check server logs.</p>',
+            '<h1>Slack OAuth Failed</h1>' +
+            '<p>Token exchange did not complete. The authorization code may be invalid or expired.</p>' +
+            '<p>Try visiting <a href="/oauth/authorize">/oauth/authorize</a> again to start a new flow.</p>',
             500,
           );
         },
