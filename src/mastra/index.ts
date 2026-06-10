@@ -16,7 +16,7 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { startOAuthFlow, completeOAuth, hasSlackTokens } from "./mcp/slack-mcp-client";
+import { startOAuthFlow, completeOAuth, hasSlackTokens, slackMcpClient } from "./mcp/slack-mcp-client";
 import { createSlackMCPServer } from "./mcp/slack-mcp-server";
 
 import {
@@ -88,30 +88,42 @@ export const builderAgent = createBuilderAgent({
     apiKey: process.env.FEATHERLESS_API_KEY!,
   },
 });
-// Register Slack MCP server using MCPServer (not MCPClientServerProxy)
-// so the streamable HTTP transport endpoint works at /api/mcp/slack/mcp.
+// Register Slack MCP: always register the proxy (for REST API),
+// and also create MCPServer if tokens exist (for transport endpoints).
 // @see https://mastra.ai/reference/tools/mcp-server
+// @see https://mastra.ai/reference/tools/mcp-client
 let slackMCPServer: any = undefined;
+let slackProxy: any = undefined;
+
+try {
+  const proxies = await slackMcpClient.toMCPServerProxies();
+  slackProxy = proxies.slack;
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.log(`[Slack MCP] Failed to create proxy: ${message}`);
+}
 
 if (await hasSlackTokens()) {
   try {
     slackMCPServer = await createSlackMCPServer();
-    console.log("[Slack MCP] Connected — tools available via MCPServer");
+    console.log("[Slack MCP] Connected — MCPServer transport endpoints available");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.log(`[Slack MCP] Failed to create MCPServer: ${message}`);
-    console.log("[Slack MCP] Visit /oauth/authorize to reconnect");
   }
 } else {
   console.log("[Slack MCP] OAuth required — visit /oauth/authorize to connect");
 }
+
+// Use MCPServer if available (supports transport), fall back to proxy (REST only)
+const slackMcpServerFinal = slackMCPServer || slackProxy;
 
 export const mastra = new Mastra({
   gateways: { featherless: featherlessGateway },
   tools: { shellTool },
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
-  mcpServers: slackMCPServer ? { slack: slackMCPServer } : {},
+  mcpServers: slackMcpServerFinal ? { slack: slackMcpServerFinal } : {},
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
