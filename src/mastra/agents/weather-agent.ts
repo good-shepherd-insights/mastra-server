@@ -20,7 +20,12 @@ export const weatherAgent = new Agent({
 
       Use the weatherTool to fetch current weather data.
 `,
-  model: 'openai/gpt-4o',
+  model: {
+    id: 'featherless/zai-org/GLM-5.1',
+    providerId: 'featherless',
+    modelId: 'zai-org/GLM-5.1',
+    apiKey: process.env.FEATHERLESS_API_KEY!,
+  },
   tools: { weatherTool },
   scorers: {
     toolCallAppropriateness: {
