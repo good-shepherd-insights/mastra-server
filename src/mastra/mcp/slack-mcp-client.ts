@@ -8,7 +8,7 @@ const REDIRECT_URL =
 
 // IMPORTANT: must NOT live inside .mastra/ — Mastra's bundler empties that
 // directory on every `mastra dev` start, which deletes saved tokens.
-const storage = new FileOAuthStorage("/Users/dev/Projects/mastra-agent-course/.oauth/slack.json");
+const storage = new FileOAuthStorage(`${process.cwd()}/.oauth/slack.json`);
 
 let pendingAuthUrl: string | null = null;
 
