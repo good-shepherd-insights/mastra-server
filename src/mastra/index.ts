@@ -17,7 +17,7 @@ import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
 import { startOAuthFlow, completeOAuth, hasSlackTokens, slackMcpClient } from "./mcp/slack-mcp-client";
-import { createSlackMCPServer } from "./mcp/slack-mcp-server";
+import { createSlackMCPServer, refreshSlackMCPServerTools } from "./mcp/slack-mcp-server";
 
 import {
   toolCallAppropriatenessScorer,
@@ -88,21 +88,19 @@ export const builderAgent = createBuilderAgent({
     apiKey: process.env.FEATHERLESS_API_KEY!,
   },
 });
-// Mutable MCP server registry so OAuth callback can refresh the Slack MCP server
-// and tool list at runtime without requiring a process restart.
-const mcpServerRegistry: Record<string, any> = {};
+// Keep one registered server instance and refresh its tool registry in place.
+// Mastra snapshots mcpServers at construction time, so replacing the map later
+// does not update runtime routes.
+const slackMcpServer = createSlackMCPServer();
 
 async function refreshSlackMcpServer(): Promise<{ ok: boolean; toolCount: number; error?: string }> {
   try {
     try {
-      await slackMcpClient.reconnectServer("slack");
+      await slackMcpClient.disconnect();
     } catch {
-      // Ignore reconnect failures on first connect / unauthenticated states.
+      // Ignore disconnect failures on first connect / unauthenticated states.
     }
-    const server = await createSlackMCPServer();
-    mcpServerRegistry.slack = server;
-    const toolListInfo = await (server as any).getToolListInfo?.();
-    const toolCount = Array.isArray(toolListInfo?.tools) ? toolListInfo.tools.length : 0;
+    const toolCount = await refreshSlackMCPServerTools(slackMcpServer);
     return { ok: true, toolCount };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -112,7 +110,7 @@ async function refreshSlackMcpServer(): Promise<{ ok: boolean; toolCount: number
 
 const startupRefresh = await refreshSlackMcpServer();
 if (!startupRefresh.ok) {
-  console.log(`[Slack MCP] Failed to create MCPServer: ${startupRefresh.error}`);
+  console.log(`[Slack MCP] Failed to refresh tools: ${startupRefresh.error}`);
 } else if (await hasSlackTokens()) {
   if (startupRefresh.toolCount > 0) {
     console.log(`[Slack MCP] Connected — ${startupRefresh.toolCount} Slack tools available`);
@@ -130,7 +128,7 @@ export const mastra = new Mastra({
   tools: { shellTool },
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
-  mcpServers: mcpServerRegistry,
+  mcpServers: { slack: slackMcpServer },
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
