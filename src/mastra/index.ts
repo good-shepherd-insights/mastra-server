@@ -16,7 +16,7 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { startOAuthFlow, completeOAuth, slackMcpClient, slackMcpServer, slackTools } from "./mcp/slack-mcp-client";
+import { startOAuthFlow, completeOAuth, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 import {
   toolCallAppropriatenessScorer,
@@ -89,8 +89,8 @@ export const builderAgent = createBuilderAgent({
 });
 export const mastra = new Mastra({
   gateways: { featherless: featherlessGateway },
-  tools: { shellTool, ...slackTools },
-  mcpServers: { slack: slackMcpServer },
+  tools: { shellTool },
+  mcpServers: {},
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
   scorers: {
@@ -141,19 +141,19 @@ export const mastra = new Mastra({
             );
           }
 
-          const result = await completeOAuth(code);
-          if (result === "AUTHORIZED") {
+          try {
+            await completeOAuth(code);
+            await startSlackMCPServer(mastra);
             return c.html(
-              '<h1>Slack OAuth Complete</h1>' +
-              '<p>Slack access tokens saved. Slack tools are now available.</p>',
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#e5e5e5;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:48px;text-align:center;max-width:420px;width:90%}h1{font-size:24px;margin-bottom:8px;color:#fff}p{font-size:15px;color:#a0a0a0;margin-bottom:32px}button{background:#fff;color:#0a0a0a;border:none;border-radius:8px;padding:12px 32px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}button:hover{opacity:.85}</style></head><body><div class="card"><h1>Slack Connected</h1><p>Slack access tokens saved. Tools are now available.</p><button onclick="window.close()">Close</button></div></body></html>',
+            );
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return c.html(
+              '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#e5e5e5;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:48px;text-align:center;max-width:420px;width:90%}h1{font-size:24px;margin-bottom:8px;color:#fff}p{font-size:15px;color:#a0a0a0;margin-bottom:32px}button{background:#fff;color:#0a0a0a;border:none;border-radius:8px;padding:12px 32px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}button:hover{opacity:.85}</style></head><body><div class="card"><h1>Slack OAuth Failed</h1><p>' + message + '</p><button onclick="window.close()">Close</button></div></body></html>',
+              500,
             );
           }
-          return c.html(
-            '<h1>Slack OAuth Failed</h1>' +
-            '<p>Token exchange did not complete. The authorization code may be invalid or expired.</p>' +
-            '<p>Try visiting <a href="/oauth/authorize">/oauth/authorize</a> again to start a new flow.</p>',
-            500,
-          );
         },
       }),
     ],
@@ -202,3 +202,6 @@ export const mastra = new Mastra({
     },
   }),
 });
+
+// If a saved OAuth token exists from a previous session, register the native Slack MCPServer now.
+await startSlackMCPServer(mastra);
