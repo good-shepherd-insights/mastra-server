@@ -12,17 +12,9 @@ import {
   CloudExporter,
   SensitiveDataFilter,
 } from "@mastra/observability";
-import { weatherWorkflow } from "./workflows/weather-workflow";
-import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
 import { startOAuthFlow, completeOAuth, slackMcpClient, slackMcpServer, slackTools } from "./mcp/slack-mcp-client";
-
-import {
-  toolCallAppropriatenessScorer,
-  completenessScorer,
-  translationScorer,
-} from "./scorers/weather-scorer";
 
 // Featherless AI — OpenAI-compatible gateway
 const FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1";
@@ -91,13 +83,7 @@ export const mastra = new Mastra({
   gateways: { featherless: featherlessGateway },
   tools: { shellTool, ...slackTools },
   mcpServers: { slack: slackMcpServer },
-  workflows: { weatherWorkflow },
-  agents: { weatherAgent, builderAgent },
-  scorers: {
-    toolCallAppropriatenessScorer,
-    completenessScorer,
-    translationScorer,
-  },
+  agents: { builderAgent },
   storage: new LibSQLStore({
     id: "mastra-storage",
     // stores observability, scores, ... into persistent file storage
@@ -169,9 +155,9 @@ export const mastra = new Mastra({
             ],
             default: { provider: "featherless", modelId: "zai-org/GLM-5.1", kind: "custom" },
           },
-          tools: { allowed: ["get-weather", "execute-shell"] },
-          agents: { allowed: ["weather-agent"] },
-          workflows: { allowed: ["weather-workflow"] },
+          tools: { allowed: ["execute-shell"] },
+          agents: { allowed: [] },
+          workflows: { allowed: [] },
           memory: { observationalMemory: true },
           workspace: {
             type: "inline",
