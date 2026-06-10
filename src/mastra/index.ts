@@ -16,8 +16,8 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { startOAuthFlow, completeOAuth, slackMcpClient } from "./mcp/slack-mcp-client";
 import { MCPServer } from "@mastra/mcp";
+import { startOAuthFlow, completeOAuth, slackMcpClient } from "./mcp/slack-mcp-client";
 
 import {
   toolCallAppropriatenessScorer,
@@ -88,17 +88,19 @@ export const builderAgent = createBuilderAgent({
     apiKey: process.env.FEATHERLESS_API_KEY!,
   },
 });
-// Register Slack MCP: no server at startup (no tokens yet).
-// After OAuth, a real MCPServer is registered via mastra.addMCPServer()
-// which handles the /mcp transport endpoint. The proxy pattern is not used
-// because MCPClientServerProxy does not support HTTP transport.
+// Register Slack MCP proxy at startup so routes are bound.
+// After OAuth, the proxy is swapped out for a real MCPServer
+// that can handle the /mcp transport endpoint.
+const slackProxyEntries = await slackMcpClient.toMCPServerProxies();
 
 export const mastra = new Mastra({
   gateways: { featherless: featherlessGateway },
   tools: { shellTool },
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
-  mcpServers: {},
+  mcpServers: {
+    ...slackProxyEntries,
+  },
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
@@ -149,9 +151,8 @@ export const mastra = new Mastra({
 
           const result = await completeOAuth(code);
           if (result === "AUTHORIZED") {
-            // After OAuth, create a real MCPServer with Slack tools and register it.
-            // Per Mastra docs, mastra.addMCPServer() dynamically registers a server
-            // that handles the /mcp transport endpoint.
+            // Swap the proxy for a real MCPServer that handles HTTP transport.
+            // addMCPServer no-ops if the key exists, so we delete the proxy first.
             try {
               const tools = await slackMcpClient.listTools();
               const slackMCPServer = new MCPServer({
@@ -160,10 +161,12 @@ export const mastra = new Mastra({
                 version: "1.0.0",
                 tools,
               });
+              const servers = mastra.listMCPServers();
+              if (servers) delete servers["slack"];
               mastra.addMCPServer(slackMCPServer, "slack");
-              console.log("[Slack MCP] Real MCPServer registered — transport endpoints available");
+              console.log("[Slack MCP] Real MCPServer registered — /mcp transport endpoint available");
             } catch (err) {
-              console.log(`[Slack MCP] Failed to create MCPServer after OAuth: ${err instanceof Error ? err.message : String(err)}`);
+              console.log(`[Slack MCP] Failed to swap proxy for MCPServer: ${err instanceof Error ? err.message : String(err)}`);
             }
             return c.html(
               '<h1>Slack OAuth Complete</h1>' +
