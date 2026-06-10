@@ -16,7 +16,7 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { startOAuthFlow, completeOAuth, slackMcpClient, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
+import { startOAuthFlow, completeOAuth, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 import {
   toolCallAppropriatenessScorer,
@@ -90,9 +90,7 @@ export const builderAgent = createBuilderAgent({
 export const mastra = new Mastra({
   gateways: { featherless: featherlessGateway },
   tools: { shellTool },
-  mcpServers: {
-    ...(await slackMcpClient.toMCPServerProxies()),
-  },
+  mcpServers: {},
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
   scorers: {
