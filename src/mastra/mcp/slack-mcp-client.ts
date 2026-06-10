@@ -98,23 +98,38 @@ if (savedToken) {
 // Per Mastra docs Pattern 2: MCPClient with url + authProvider
 export const slackMcpClient = new MCPClient({
   servers: {
-    slack: {
+    slackProxy: {
       url: new URL(SLACK_MCP_URL),
       authProvider: authProvider,
     },
   },
 });
 
-// Per Mastra docs Pattern 1: listTools() for agent tools
-export const slackTools = await slackMcpClient.listTools();
+// Per Mastra docs Pattern 1: listToolsets() for dynamic per-request tool resolution.
+// listTools() freezes at boot with empty tools when no auth token exists yet.
+// listToolsets() fetches tools live from the MCP server on each call,
+// so it picks up fresh tokens from storage after OAuth completes.
+// Use this in agent.stream()/generate() calls via the `toolsets` option.
+export const getSlackToolsets = () => slackMcpClient.listToolsets();
 
-// Register an MCPServer that exposes the Slack tools over HTTP at /api/mcp/slack/*
-export const slackMcpServer = new MCPServer({
-  id: "slack",
-  name: "Slack MCP",
-  version: "1.0.0",
-  tools: slackTools,
-});
+// Lazy MCPServer construction: only instantiate after OAuth token is available.
+// Call after Mastra construction (for rehydration) and after OAuth completes.
+export async function startSlackMCPServer(mastra: import("@mastra/core/mastra").Mastra): Promise<void> {
+  const token = await oauthStorage.get("tokens");
+  if (!token) return;
+
+  const slackTools = await slackMcpClient.listTools().catch(() => null);
+  if (!slackTools || Object.keys(slackTools).length === 0) return;
+
+  try {
+    mastra.addMCPServer(new MCPServer({
+      id: "slack",
+      name: "Slack MCP",
+      version: "1.0.0",
+      tools: slackTools,
+    }));
+  } catch {}
+}
 
 export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
   const result = await auth(oauthProvider, {
