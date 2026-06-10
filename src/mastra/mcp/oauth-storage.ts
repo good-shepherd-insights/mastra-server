@@ -25,8 +25,12 @@ export class FileOAuthStorage implements OAuthStorage {
   }
 
   private keyFilePath(key: string): string {
+    // Known Mastra keys are all lowercase + underscores ("tokens", "client_info",
+    // "code_verifier"). Prefix with "oauth-" to avoid collisions with unrelated
+    // files in the same directory, and escape conservatively to prevent path
+    // traversal.
     const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, "_");
-    return path.join(this.storageDirectory, `${safeKey}.json`);
+    return path.join(this.storageDirectory, `oauth-${safeKey}.json`);
   }
 
   private async readLegacyMap(): Promise<Record<string, string | undefined>> {
@@ -72,15 +76,21 @@ export class FileOAuthStorage implements OAuthStorage {
       // Ignore missing key files.
     }
     // Remove key from legacy map too so fallback reads cannot resurrect deleted values.
-    const legacy = await this.readLegacyMap();
-    if (key in legacy) {
-      delete legacy[key];
-      try {
-        await fs.promises.mkdir(path.dirname(this.legacyFilePath), { recursive: true });
-        await fs.promises.writeFile(this.legacyFilePath, JSON.stringify(legacy, null, 2), "utf-8");
-      } catch {
-        // Ignore legacy cleanup failures.
+    try {
+      const legacy = await this.readLegacyMap();
+      if (key in legacy) {
+        delete legacy[key];
+        const dir = path.dirname(this.legacyFilePath);
+        await fs.promises.mkdir(dir, { recursive: true });
+        // Atomic write: write temp file first, then rename into place.
+        const tempPath =
+          `${this.legacyFilePath}.tmp-${process.pid}-${Date.now()}-` +
+          `${Math.random().toString(16).slice(2)}`;
+        await fs.promises.writeFile(tempPath, JSON.stringify(legacy, null, 2), "utf-8");
+        await fs.promises.rename(tempPath, this.legacyFilePath);
       }
+    } catch {
+      // Legacy file doesn't exist or is unreadable — nothing to do.
     }
   }
 }
