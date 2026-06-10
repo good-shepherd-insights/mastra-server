@@ -13,6 +13,7 @@ import type { OAuthStorage } from "@mastra/mcp";
  */
 export class FileOAuthStorage implements OAuthStorage {
   private filePath: string;
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -33,19 +34,26 @@ export class FileOAuthStorage implements OAuthStorage {
   }
 
   async set(key: string, value: string): Promise<void> {
-    const data = await this.load();
-    data[key] = value;
-    await this.save(data);
+    this.writeChain = this.writeChain.catch(() => {}).then(async () => {
+      const data = await this.load();
+      data[key] = value;
+      await this.save(data);
+    });
+    await this.writeChain;
   }
 
   async get(key: string): Promise<string | undefined> {
+    await this.writeChain;
     const data = await this.load();
     return data[key];
   }
 
   async delete(key: string): Promise<void> {
-    const data = await this.load();
-    delete data[key];
-    await this.save(data);
+    this.writeChain = this.writeChain.catch(() => {}).then(async () => {
+      const data = await this.load();
+      delete data[key];
+      await this.save(data);
+    });
+    await this.writeChain;
   }
 }
