@@ -4,8 +4,8 @@ import { createClient, type Client } from "@libsql/client";
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
   process.env.SLACK_OAUTH_REDIRECT_URL ?? "http://localhost:4111/oauth/callback";
-const DATABASE_URL = process.env.DATABASE_URL ?? "file:./mastra.db";
-const DATABASE_AUTH_TOKEN = process.env.DATABASE_AUTH_TOKEN;
+const DATABASE_URL = process.env.SLACK_OAUTH_DATABASE_URL ?? "file:./mastra-oauth.db";
+const DATABASE_AUTH_TOKEN = process.env.SLACK_OAUTH_DATABASE_AUTH_TOKEN;
 
 // Per Mastra docs Pattern 3: implement OAuthStorage backed by a database.
 // Uses the same libsql DB the project's LibSQLStore is configured against.
