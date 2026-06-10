@@ -1,4 +1,4 @@
-import { MCPClient, MCPOAuthClientProvider, MCPServer, OAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
+import { MCPClient, MCPOAuthClientProvider, OAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
 import { createClient, type Client } from "@libsql/client";
 
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
@@ -79,10 +79,11 @@ const oauthProvider = new MCPOAuthClientProvider({
   },
 });
 
-// Per Mastra docs Pattern 4: createSimpleTokenProvider for token rehydration
-const savedToken = await oauthStorage.get("tokens");
-const authProvider = savedToken
-  ? createSimpleTokenProvider(JSON.parse(savedToken).access_token, {
+// Per Mastra docs Pattern 4: createSimpleTokenProvider for token rehydration via
+// the provider's own tokens() method (which reads + parses the "tokens" key from storage).
+const savedTokens = await oauthProvider.tokens();
+const authProvider = savedTokens?.access_token
+  ? createSimpleTokenProvider(savedTokens.access_token, {
       redirectUrl: REDIRECT_URL,
       clientMetadata: {
         redirect_uris: [REDIRECT_URL],
@@ -91,7 +92,7 @@ const authProvider = savedToken
     })
   : oauthProvider;
 
-if (savedToken) {
+if (savedTokens?.access_token) {
   console.log("[Slack MCP] Found saved token — reusing session.");
 }
 
@@ -107,14 +108,6 @@ export const slackMcpClient = new MCPClient({
 
 // Per Mastra docs Pattern 1: listTools() for agent tools
 export const slackTools = await slackMcpClient.listTools();
-
-// Register an MCPServer that exposes the Slack tools over HTTP at /api/mcp/slack/*
-export const slackMcpServer = new MCPServer({
-  id: "slack",
-  name: "Slack MCP",
-  version: "1.0.0",
-  tools: slackTools,
-});
 
 export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
   const result = await auth(oauthProvider, {
