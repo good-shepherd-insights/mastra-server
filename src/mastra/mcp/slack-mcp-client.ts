@@ -5,10 +5,18 @@ import { FileOAuthStorage } from "./oauth-storage.js";
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
   process.env.SLACK_OAUTH_REDIRECT_URL ?? "http://localhost:4111/oauth/callback";
+const DEFAULT_OAUTH_STORAGE_PATH = `${process.cwd()}/.oauth/slack.json`;
+const OAUTH_STORAGE_PATH = process.env.SLACK_OAUTH_STORAGE_PATH ?? DEFAULT_OAUTH_STORAGE_PATH;
 
 // IMPORTANT: must NOT live inside .mastra/ — Mastra's bundler empties that
 // directory on every `mastra dev` start, which deletes saved tokens.
-const storage = new FileOAuthStorage(`${process.cwd()}/.oauth/slack.json`);
+// In production, this path must be on persistent storage (e.g. Render disk mount).
+if (process.env.NODE_ENV === "production" && !process.env.SLACK_OAUTH_STORAGE_PATH) {
+  console.warn(
+    `[Slack MCP] SLACK_OAUTH_STORAGE_PATH is not set. Tokens are stored at ${DEFAULT_OAUTH_STORAGE_PATH}, which may be ephemeral across deploys/restarts.`,
+  );
+}
+const storage = new FileOAuthStorage(OAUTH_STORAGE_PATH);
 
 let pendingAuthUrl: string | null = null;
 
