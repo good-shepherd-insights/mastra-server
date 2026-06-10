@@ -88,36 +88,36 @@ export const builderAgent = createBuilderAgent({
     apiKey: process.env.FEATHERLESS_API_KEY!,
   },
 });
-// Register Slack MCP as a real MCPServer (not a client proxy).
-//
-// MCPClientServerProxy (from MCPClient.toMCPServerProxies()) only implements
-// the REST tool-list/execute API. Its startHTTP()/startSSE() throw
-// "MCPClientServerProxy does not support HTTP transport", which the deployer
-// surfaces as a 500 on the /api/mcp/slack/mcp and /api/mcp/slack/sse transport
-// endpoints. A real MCPServer supports both the REST API and the
-// streamable-HTTP / SSE transports.
-//
-// MCPClient.listTools() swallows per-server connection errors and returns an
-// empty tool set when Slack is not yet authorized, so createSlackMCPServer()
-// is safe to call unconditionally: before OAuth the transport responds with an
-// empty tool set instead of a 500; after OAuth (and a server restart) it
-// exposes the live Slack tools.
-//
-// @see https://mastra.ai/reference/tools/mcp-server
-let slackMcpServerFinal: any = undefined;
+// Mutable MCP server registry so OAuth callback can refresh the Slack MCP server
+// and tool list at runtime without requiring a process restart.
+const mcpServerRegistry: Record<string, any> = {};
 
-try {
-  slackMcpServerFinal = await createSlackMCPServer();
-  if (await hasSlackTokens()) {
-    console.log("[Slack MCP] Connected — Slack tools available via MCPServer transport endpoints");
-  } else {
-    console.log(
-      "[Slack MCP] OAuth required — visit /oauth/authorize to connect (transport endpoints available, empty tool set until authorized)",
-    );
+async function refreshSlackMcpServer(): Promise<{ ok: boolean; toolCount: number; error?: string }> {
+  try {
+    const server = await createSlackMCPServer();
+    mcpServerRegistry.slack = server;
+    const toolListInfo = await (server as any).getToolListInfo?.();
+    const toolCount = Array.isArray(toolListInfo?.tools) ? toolListInfo.tools.length : 0;
+    return { ok: true, toolCount };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, toolCount: 0, error: message };
   }
-} catch (err) {
-  const message = err instanceof Error ? err.message : String(err);
-  console.log(`[Slack MCP] Failed to create MCPServer: ${message}`);
+}
+
+const startupRefresh = await refreshSlackMcpServer();
+if (!startupRefresh.ok) {
+  console.log(`[Slack MCP] Failed to create MCPServer: ${startupRefresh.error}`);
+} else if (await hasSlackTokens()) {
+  if (startupRefresh.toolCount > 0) {
+    console.log(`[Slack MCP] Connected — ${startupRefresh.toolCount} Slack tools available`);
+  } else {
+    console.log("[Slack MCP] Tokens detected, but Slack returned 0 tools");
+  }
+} else {
+  console.log(
+    "[Slack MCP] OAuth required — visit /oauth/authorize to connect (transport endpoints are available)",
+  );
 }
 
 export const mastra = new Mastra({
@@ -125,7 +125,7 @@ export const mastra = new Mastra({
   tools: { shellTool },
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
-  mcpServers: slackMcpServerFinal ? { slack: slackMcpServerFinal } : {},
+  mcpServers: mcpServerRegistry,
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
@@ -147,6 +147,25 @@ export const mastra = new Mastra({
         method: "GET",
         requiresAuth: false,
         handler: async (c) => {
+          if (await hasSlackTokens()) {
+            const refreshed = await refreshSlackMcpServer();
+            if (!refreshed.ok) {
+              return c.html(
+                `<h1>OAuth Status</h1><p>Slack tokens detected, but MCP tool refresh failed: ${refreshed.error}</p>`,
+                500,
+              );
+            }
+
+            if (refreshed.toolCount > 0) {
+              return c.html(
+                `<h1>OAuth Status</h1><p>Already connected. ${refreshed.toolCount} Slack tools are currently available.</p>`,
+              );
+            }
+
+            return c.html(
+              "<h1>OAuth Status</h1><p>Tokens are present, but Slack currently returns 0 tools. Verify scopes/installation, then retry /oauth/authorize.</p>",
+            );
+          }
           try {
             const authUrl = await startOAuthFlow();
             return c.redirect(authUrl);
@@ -174,11 +193,22 @@ export const mastra = new Mastra({
 
           const result = await completeOAuth(code);
           if (result === "AUTHORIZED" && (await hasSlackTokens())) {
-            // Tokens saved — create MCPServer so transport endpoint works.
-            // The user needs to restart the server for the new MCPServer to register,
-            // since Mastra's mcpServers is set at construction time.
+            const refreshed = await refreshSlackMcpServer();
+            if (!refreshed.ok) {
+              return c.html(
+                `<h1>OAuth Complete</h1><p>Tokens saved, but MCP tool refresh failed: ${refreshed.error}</p>`,
+                500,
+              );
+            }
+
+            if (refreshed.toolCount > 0) {
+              return c.html(
+                `<h1>OAuth Complete</h1><p>Slack MCP connected with ${refreshed.toolCount} tools available.</p>`,
+              );
+            }
+
             return c.html(
-              '<h1>OAuth Complete</h1><p>Slack MCP connected. Tools are now available in Studio.</p>',
+              "<h1>OAuth Complete</h1><p>Tokens saved, but Slack returned 0 tools. Verify scopes/installation and retry /oauth/authorize.</p>",
             );
           }
           return c.html(
