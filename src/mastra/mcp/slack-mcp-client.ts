@@ -1,32 +1,11 @@
-import { MCPClient, MCPOAuthClientProvider, MCPServer, OAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
-import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { MCPClient, MCPOAuthClientProvider, MCPServer, InMemoryOAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
 
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
   process.env.SLACK_OAUTH_REDIRECT_URL ?? "http://localhost:4111/oauth/callback";
-const TOKEN_DIR = join(process.cwd(), ".mastra", "oauth-tokens");
 
-// Per Mastra docs Pattern 3: implement OAuthStorage for persistent token storage
-class FileOAuthStorage implements OAuthStorage {
-  private pathForKey(key: string): string {
-    return join(TOKEN_DIR, `${key}.json`);
-  }
-  async set(key: string, value: string): Promise<void> {
-    await mkdir(TOKEN_DIR, { recursive: true });
-    await writeFile(this.pathForKey(key), value, "utf-8");
-  }
-  async get(key: string): Promise<string | undefined> {
-    try { return await readFile(this.pathForKey(key), "utf-8"); }
-    catch { return undefined; }
-  }
-  async delete(key: string): Promise<void> {
-    try { await unlink(this.pathForKey(key)); }
-    catch { /* already gone */ }
-  }
-}
-
-const oauthStorage = new FileOAuthStorage();
+// Per Mastra docs Pattern 3: InMemoryOAuthStorage for OAuth state
+const oauthStorage = new InMemoryOAuthStorage();
 let pendingAuthUrl: string | null = null;
 
 // Per Mastra docs Pattern 2: MCPOAuthClientProvider for OAuth
