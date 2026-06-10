@@ -16,7 +16,8 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { oauthProvider, startOAuthFlow, completeOAuth, hasSlackTokens, slackMcpClient } from "./mcp/slack-mcp-client";
+import { startOAuthFlow, completeOAuth, hasSlackTokens } from "./mcp/slack-mcp-client";
+import { createSlackMCPServer } from "./mcp/slack-mcp-server";
 
 import {
   toolCallAppropriatenessScorer,
@@ -87,61 +88,22 @@ export const builderAgent = createBuilderAgent({
     apiKey: process.env.FEATHERLESS_API_KEY!,
   },
 });
-// Mutable registry for dynamic MCP server registration.
-const mcpServerRegistry: Record<string, any> = {};
+// Register Slack MCP server using MCPServer (not MCPClientServerProxy)
+// so the streamable HTTP transport endpoint works at /api/mcp/slack/mcp.
+// @see https://mastra.ai/reference/tools/mcp-server
+let slackMCPServer: any = undefined;
 
-// Always attempt to register Slack MCP so it appears in Studio.
-// Connection errors (401 from missing tokens) are caught and logged as info.
-// Wrap proxy to suppress connection error logs from Studio polling.
-// Preserves prototype chain by wrapping methods on the original object.
-function wrapSlackProxy(proxy: any) {
-  const methodsToWrap = ['fetchToolList', 'fetchToolInfo', 'executeTool', 'fetchResourceList', 'fetchPromptList'];
-  
-  for (const method of methodsToWrap) {
-    if (typeof proxy[method] === 'function') {
-      const original = proxy[method].bind(proxy);
-      Object.defineProperty(proxy, method, {
-        value: async (...args: any[]) => {
-          try {
-            return await original(...args);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('Unauthorized') || msg.includes('401') || msg.includes('Could not connect')) {
-              // Return empty result instead of throwing to suppress Mastra ERROR logs
-              if (method === 'fetchToolList') return { tools: [] };
-              if (method === 'fetchResourceList') return { resources: [] };
-              if (method === 'fetchPromptList') return { prompts: [] };
-              return null;
-            }
-            throw err;
-          }
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
+if (await hasSlackTokens()) {
+  try {
+    slackMCPServer = await createSlackMCPServer();
+    console.log("[Slack MCP] Connected — tools available via MCPServer");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`[Slack MCP] Failed to create MCPServer: ${message}`);
+    console.log("[Slack MCP] Visit /oauth/authorize to reconnect");
   }
-  return proxy;
-}
-
-try {
-  const proxies = await slackMcpClient.toMCPServerProxies();
-  if (proxies.slack) {
-    mcpServerRegistry.slack = wrapSlackProxy(proxies.slack);
-  }
-  if (await hasSlackTokens()) {
-    console.log("[Slack MCP] Connected — tools available in Studio");
-  } else {
-    console.log("[Slack MCP] OAuth required — visit /oauth/authorize to connect");
-  }
-} catch (err) {
-  // Suppress auth/connection errors — user just needs to complete OAuth
-  const message = err instanceof Error ? err.message : String(err);
-  if (message.includes("unauthorized") || message.includes("401") || message.includes("connect")) {
-    console.log("[Slack MCP] OAuth required — visit /oauth/authorize to connect");
-  } else {
-    console.log("[Slack MCP] Connection pending — visit /oauth/authorize to connect");
-  }
+} else {
+  console.log("[Slack MCP] OAuth required — visit /oauth/authorize to connect");
 }
 
 export const mastra = new Mastra({
@@ -149,7 +111,7 @@ export const mastra = new Mastra({
   tools: { shellTool },
   workflows: { weatherWorkflow },
   agents: { weatherAgent, builderAgent },
-  mcpServers: mcpServerRegistry,
+  mcpServers: slackMCPServer ? { slack: slackMCPServer } : {},
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
@@ -198,19 +160,9 @@ export const mastra = new Mastra({
 
           const result = await completeOAuth(code);
           if (result === "AUTHORIZED" && (await hasSlackTokens())) {
-            // Tokens saved — ensure Slack MCP proxy is registered.
-            // If it wasn't registered at startup (due to missing tokens), add it now.
-            if (!mcpServerRegistry.slack) {
-              try {
-                const proxies = await slackMcpClient.toMCPServerProxies();
-                if (proxies.slack) {
-                  mcpServerRegistry.slack = wrapSlackProxy(proxies.slack);
-                }
-                console.log("[Slack MCP] Connected after OAuth — tools available");
-              } catch (err) {
-                console.log("[Slack MCP] OAuth completed but proxy registration failed — restart server");
-              }
-            }
+            // Tokens saved — create MCPServer so transport endpoint works.
+            // The user needs to restart the server for the new MCPServer to register,
+            // since Mastra's mcpServers is set at construction time.
             return c.html(
               '<h1>OAuth Complete</h1><p>Slack MCP connected. Tools are now available in Studio.</p>',
             );
