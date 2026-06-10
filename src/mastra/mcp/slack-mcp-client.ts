@@ -1,14 +1,36 @@
-import { MCPClient, MCPOAuthClientProvider, auth } from "@mastra/mcp";
+import { MCPClient, MCPOAuthClientProvider, MCPServer, OAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
+import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
 
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
   process.env.SLACK_OAUTH_REDIRECT_URL ?? "http://localhost:4111/oauth/callback";
+const TOKEN_DIR = join(process.cwd(), ".mastra", "oauth-tokens");
 
+// Per Mastra docs Pattern 3: implement OAuthStorage for persistent token storage
+class FileOAuthStorage implements OAuthStorage {
+  private pathForKey(key: string): string {
+    return join(TOKEN_DIR, `${key}.json`);
+  }
+  async set(key: string, value: string): Promise<void> {
+    await mkdir(TOKEN_DIR, { recursive: true });
+    await writeFile(this.pathForKey(key), value, "utf-8");
+  }
+  async get(key: string): Promise<string | undefined> {
+    try { return await readFile(this.pathForKey(key), "utf-8"); }
+    catch { return undefined; }
+  }
+  async delete(key: string): Promise<void> {
+    try { await unlink(this.pathForKey(key)); }
+    catch { /* already gone */ }
+  }
+}
+
+const oauthStorage = new FileOAuthStorage();
 let pendingAuthUrl: string | null = null;
 
-// Per Mastra docs (reference/tools/mcp-client), omitting storage
-// defaults to InMemoryOAuthStorage. No custom storage needed.
-export const oauthProvider = new MCPOAuthClientProvider({
+// Per Mastra docs Pattern 2: MCPOAuthClientProvider for OAuth
+const oauthProvider = new MCPOAuthClientProvider({
   redirectUrl: REDIRECT_URL,
   clientMetadata: {
     redirect_uris: [REDIRECT_URL],
@@ -20,20 +42,49 @@ export const oauthProvider = new MCPOAuthClientProvider({
     client_id: process.env.SLACK_CLIENT_ID!,
     client_secret: process.env.SLACK_CLIENT_SECRET!,
   },
+  storage: oauthStorage,
+  // Per Mastra docs: onRedirectToAuthorization handles sending user to Slack's auth page
   onRedirectToAuthorization: (url) => {
     pendingAuthUrl = url.toString();
-    console.log(`[Slack MCP] OAuth required. Visit:\n${url}`);
+    console.log(`[Slack MCP] OAuth required. Visit: ${url}`);
   },
 });
 
+// Per Mastra docs Pattern 4: createSimpleTokenProvider for token rehydration
+const savedToken = await oauthStorage.get("tokens");
+const authProvider = savedToken
+  ? createSimpleTokenProvider(JSON.parse(savedToken).access_token, {
+      redirectUrl: REDIRECT_URL,
+      clientMetadata: {
+        redirect_uris: [REDIRECT_URL],
+        client_name: "Mastra Slack MCP Client",
+      },
+    })
+  : oauthProvider;
+
+if (savedToken) {
+  console.log("[Slack MCP] Found saved token — reusing session.");
+}
+
+// Per Mastra docs Pattern 2: MCPClient with url + authProvider
 export const slackMcpClient = new MCPClient({
-  id: "slack-mcp-client",
   servers: {
     slack: {
       url: new URL(SLACK_MCP_URL),
-      authProvider: oauthProvider,
+      authProvider: authProvider,
     },
   },
+});
+
+// Per Mastra docs Pattern 1: listTools() for agent tools
+export const slackTools = await slackMcpClient.listTools();
+
+// Register an MCPServer that exposes the Slack tools over HTTP at /api/mcp/slack/*
+export const slackMcpServer = new MCPServer({
+  id: "slack",
+  name: "Slack MCP",
+  version: "1.0.0",
+  tools: slackTools,
 });
 
 export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
@@ -50,11 +101,15 @@ export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
   }
 
   pendingAuthUrl = null;
-  console.log("[Slack MCP] OAuth complete. Tokens saved.");
+  console.log("[Slack MCP] OAuth complete. Tokens saved to persistent storage.");
   return result;
 }
 
 export async function startOAuthFlow(): Promise<string> {
+  // Clear any stale tokens so we always start a fresh OAuth flow
+  await oauthStorage.delete("tokens");
+  await oauthStorage.delete("code_verifier");
+
   let result: "AUTHORIZED" | "REDIRECT";
   try {
     result = await auth(oauthProvider, {
