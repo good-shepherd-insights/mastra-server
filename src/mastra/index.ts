@@ -16,7 +16,7 @@ import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute } from "@mastra/core/server";
-import { startOAuthFlow, completeOAuth, hasSlackTokens } from "./mcp/slack-mcp-client";
+import { startOAuthFlow, completeOAuth, hasSlackTokens, slackMcpClient } from "./mcp/slack-mcp-client";
 import { createSlackMCPServer } from "./mcp/slack-mcp-server";
 
 import {
@@ -94,6 +94,11 @@ const mcpServerRegistry: Record<string, any> = {};
 
 async function refreshSlackMcpServer(): Promise<{ ok: boolean; toolCount: number; error?: string }> {
   try {
+    try {
+      await slackMcpClient.reconnectServer("slack");
+    } catch {
+      // Ignore reconnect failures on first connect / unauthenticated states.
+    }
     const server = await createSlackMCPServer();
     mcpServerRegistry.slack = server;
     const toolListInfo = await (server as any).getToolListInfo?.();
@@ -163,7 +168,8 @@ export const mastra = new Mastra({
             }
 
             return c.html(
-              "<h1>OAuth Status</h1><p>Tokens are present, but Slack currently returns 0 tools. Verify scopes/installation, then retry /oauth/authorize.</p>",
+              "<h1>OAuth Not Usable</h1><p>Tokens are present, but this runtime currently has 0 Slack tools. Re-run /oauth/authorize and verify Slack app scopes/installation.</p>",
+              500,
             );
           }
           try {
@@ -196,19 +202,20 @@ export const mastra = new Mastra({
             const refreshed = await refreshSlackMcpServer();
             if (!refreshed.ok) {
               return c.html(
-                `<h1>OAuth Complete</h1><p>Tokens saved, but MCP tool refresh failed: ${refreshed.error}</p>`,
+                `<h1>OAuth Not Usable</h1><p>Token exchange completed, but MCP tool refresh failed: ${refreshed.error}</p>`,
                 500,
               );
             }
 
             if (refreshed.toolCount > 0) {
               return c.html(
-                `<h1>OAuth Complete</h1><p>Slack MCP connected with ${refreshed.toolCount} tools available.</p>`,
+                `<h1>OAuth Usable</h1><p>Slack MCP is usable on this runtime. Current tool count: ${refreshed.toolCount}.</p>`,
               );
             }
 
             return c.html(
-              "<h1>OAuth Complete</h1><p>Tokens saved, but Slack returned 0 tools. Verify scopes/installation and retry /oauth/authorize.</p>",
+              "<h1>OAuth Not Usable</h1><p>Token exchange completed, but this runtime still has 0 Slack tools. Treating OAuth as failed for tool access; verify scopes/installation and retry /oauth/authorize.</p>",
+              500,
             );
           }
           return c.html(
