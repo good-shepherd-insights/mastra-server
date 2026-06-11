@@ -95,7 +95,9 @@ if (savedToken) {
   console.log("[Slack MCP] Found saved token — reusing session.");
 }
 
-// Per Mastra docs Pattern 2: MCPClient with url + authProvider
+// MCPClient prefixes tool names with its server key (e.g. key + "_" + toolName).
+// Since the Slack MCP server already names its tools with "slack_", the server key
+// here must not duplicate that. Using a minimal key avoids redundant prefixes.
 export const slackMcpClient = new MCPClient({
   servers: {
     slack: {
@@ -105,40 +107,8 @@ export const slackMcpClient = new MCPClient({
   },
 });
 
-// The MCPClient prefixes tool names with its server key (e.g. "slack_slack_send_message").
-// Since the Slack MCP server already names its tools with "slack_", we strip the
-// redundant prefix so tools appear as "send_message" not "slack_slack_send_message".
-const SLACK_PREFIX = "slack_";
-
-function stripSlackPrefix<K extends Record<string, unknown>>(map: K): K {
-  const stripped: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(map)) {
-    const cleanKey = key.startsWith(SLACK_PREFIX) ? key.slice(SLACK_PREFIX.length) : key;
-    stripped[cleanKey] = value;
-  }
-  return stripped as K;
-}
-
 // Per Mastra docs Pattern 1: listToolsets() for dynamic per-request tool resolution.
-// listToolsets() returns keys in the format "serverName.toolName" (e.g. "slack.slack_send_message").
-// Strip the redundant "slack_" prefix from the inner tool name so keys become
-// "slack.send_message" instead of "slack.slack_send_message".
-export const getSlackToolsets = async () => {
-  const toolsets = await slackMcpClient.listToolsets();
-  const stripped: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(toolsets)) {
-    const dotIndex = key.indexOf(".");
-    if (dotIndex === -1) {
-      stripped[key] = value;
-      continue;
-    }
-    const serverPart = key.slice(0, dotIndex + 1);
-    const toolPart = key.slice(dotIndex + 1);
-    const cleanToolPart = toolPart.startsWith(SLACK_PREFIX) ? toolPart.slice(SLACK_PREFIX.length) : toolPart;
-    stripped[`${serverPart}${cleanToolPart}`] = value;
-  }
-  return stripped as Awaited<ReturnType<typeof slackMcpClient.listToolsets>>;
-};
+export const getSlackToolsets = () => slackMcpClient.listToolsets();
 
 // Lazy MCPServer construction: only instantiate after OAuth token is available.
 // Call after Mastra construction (for rehydration) and after OAuth completes.
@@ -149,14 +119,19 @@ export async function startSlackMCPServer(mastra: import("@mastra/core/mastra").
   const rawTools = await slackMcpClient.listTools().catch(() => null);
   if (!rawTools || Object.keys(rawTools).length === 0) return;
 
-  const slackTools = stripSlackPrefix(rawTools);
+  // MCPClient.listTools() prefixes keys with "serverKey_", producing "slack_slack_send_message".
+  // Remove the "slack_" prefix so tools appear as "slack_send_message" under the native MCPServer.
+  const tools: typeof rawTools = {};
+  for (const [key, value] of Object.entries(rawTools)) {
+    tools[key.startsWith("slack_") ? key.slice(6) : key] = value;
+  }
 
   try {
     mastra.addMCPServer(new MCPServer({
       id: "slack",
       name: "Slack MCP",
       version: "1.0.0",
-      tools: slackTools,
+      tools,
     }));
   } catch {}
 }
