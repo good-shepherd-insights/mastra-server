@@ -98,7 +98,7 @@ if (savedToken) {
 // Per Mastra docs Pattern 2: MCPClient with url + authProvider
 export const slackMcpClient = new MCPClient({
   servers: {
-    slackProxy: {
+    slack: {
       url: new URL(SLACK_MCP_URL),
       authProvider: authProvider,
     },
