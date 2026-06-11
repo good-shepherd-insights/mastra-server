@@ -4,6 +4,17 @@ import { createClient, type Client } from "@libsql/client";
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
   process.env.SLACK_OAUTH_REDIRECT_URL ?? "http://localhost:4111/oauth/callback";
+
+// Bot scopes required by Slack's MCP server for canvases, lists, and remote files access.
+// These must match the scopes configured in your Slack app manifest under oauth_config.scopes.bot.
+const SLACK_BOT_SCOPES = [
+  "canvases:read",
+  "canvases:write",
+  "lists:read",
+  "lists:write",
+  "remote_files:read",
+] as const;
+const SLACK_BOT_SCOPE_STRING = SLACK_BOT_SCOPES.join(" ");
 const DATABASE_URL = process.env.SLACK_OAUTH_DATABASE_URL ?? "file:./mastra-oauth.db";
 const DATABASE_AUTH_TOKEN = process.env.SLACK_OAUTH_DATABASE_AUTH_TOKEN;
 
@@ -88,6 +99,7 @@ const authProvider = savedToken
         redirect_uris: [REDIRECT_URL],
         client_name: "Mastra Slack MCP Client",
       },
+      scope: SLACK_BOT_SCOPE_STRING,
     })
   : oauthProvider;
 
@@ -135,6 +147,7 @@ export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
   const result = await auth(oauthProvider, {
     serverUrl: SLACK_MCP_URL,
     authorizationCode: code,
+    scope: SLACK_BOT_SCOPE_STRING,
   });
 
   if (result !== "AUTHORIZED") {
@@ -158,6 +171,7 @@ export async function startOAuthFlow(): Promise<string> {
   try {
     result = await auth(oauthProvider, {
       serverUrl: SLACK_MCP_URL,
+      scope: SLACK_BOT_SCOPE_STRING,
     });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
