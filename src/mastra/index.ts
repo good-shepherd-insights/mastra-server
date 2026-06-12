@@ -23,12 +23,7 @@ import {
 } from "./scorers/weather-scorer";
 
 export const builderAgent = createBuilderAgent({
-  model: {
-    id: 'auth-gateway/featherless/zai-org/GLM-5.1',
-    providerId: 'featherless',
-    modelId: 'zai-org/GLM-5.1',
-    apiKey: process.env.AUTH_GATEWAY_API_KEY!,
-  },
+  model: 'auth-gateway/featherless/zai-org/GLM-5.1',
 });
 export const mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
@@ -107,12 +102,7 @@ export const mastra = new Mastra({
       configuration: {
         agent: {
           models: {
-            allowed: [
-              { provider: "auth-gateway", modelId: "featherless/zai-org/GLM-5.1", kind: "custom" },
-              { provider: "auth-gateway", modelId: "openrouter/anthropic/claude-sonnet-4-6", kind: "custom" },
-              { provider: "auth-gateway", modelId: "cerebras/gpt-oss-120b", kind: "custom" },
-            ],
-            default: { provider: "auth-gateway", modelId: "featherless/zai-org/GLM-5.1", kind: "custom" },
+            default: { kind: 'custom', provider: 'featherless', modelId: 'zai-org/GLM-5.1' },
           },
           tools: { allowed: ["get-weather", "execute-shell"] },
           agents: { allowed: ["weather-agent"] },

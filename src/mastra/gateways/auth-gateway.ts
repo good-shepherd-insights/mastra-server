@@ -1,10 +1,8 @@
-import { MastraModelGateway, type ProviderConfig } from '@mastra/core/llm';
+import { MastraModelGateway, type ProviderConfig, type GatewayLanguageModel } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { openrouter } from './openrouter';
-import { cerebras } from './cerebras';
 import { featherless } from './featherless';
 
-const providers = { openrouter, cerebras, featherless };
+const GATEWAY_API_KEY_ENV = 'AUTH_GATEWAY_API_KEY';
 
 export class AuthGateway extends MastraModelGateway {
   readonly id = 'auth-gateway' as const;
@@ -12,40 +10,27 @@ export class AuthGateway extends MastraModelGateway {
 
   async fetchProviders(): Promise<Record<string, ProviderConfig>> {
     return {
-      openrouter: {
-        name: openrouter.name,
-        models: openrouter.models,
-        apiKeyEnvVar: 'AUTH_GATEWAY_API_KEY',
-        gateway: this.id,
-        url: openrouter.url,
-      },
-      cerebras: {
-        name: cerebras.name,
-        models: cerebras.models,
-        apiKeyEnvVar: 'AUTH_GATEWAY_API_KEY',
-        gateway: this.id,
-        url: cerebras.url,
-      },
       featherless: {
         name: featherless.name,
         models: featherless.models,
-        apiKeyEnvVar: 'AUTH_GATEWAY_API_KEY',
+        apiKeyEnvVar: featherless.apiKeyEnvVar,
         gateway: this.id,
         url: featherless.url,
       },
     };
   }
 
-  buildUrl(modelId: string, envVars?: Record<string, string>): string {
+  buildUrl(modelId: string): string {
     const providerId = modelId.split('/')[0];
-    const provider = providers[providerId as keyof typeof providers];
-    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
-    return provider.url;
+    if (providerId !== 'featherless') throw new Error(`Unknown provider: ${providerId}`);
+    return featherless.url;
   }
 
-  async getApiKey(modelId: string): Promise<string> {
-    const apiKey = process.env.AUTH_GATEWAY_API_KEY;
-    if (!apiKey) throw new Error('Missing AUTH_GATEWAY_API_KEY');
+  async getApiKey(_modelId: string): Promise<string> {
+    const apiKey = process.env[GATEWAY_API_KEY_ENV];
+    if (!apiKey) {
+      throw new Error(`Missing ${GATEWAY_API_KEY_ENV} environment variable.`);
+    }
     return apiKey;
   }
 
@@ -57,19 +42,24 @@ export class AuthGateway extends MastraModelGateway {
     modelId: string;
     providerId: string;
     apiKey: string;
-  }) {
-    const provider = providers[providerId as keyof typeof providers];
-    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
+  }): Promise<GatewayLanguageModel> {
+    if (apiKey !== process.env[GATEWAY_API_KEY_ENV]) {
+      throw new Error('Invalid Auth Gateway API key.');
+    }
 
-    const upstreamApiKey = process.env[provider.apiKeyEnvVar];
-    if (!upstreamApiKey) throw new Error(`Missing ${provider.apiKeyEnvVar}`);
+    if (providerId !== 'featherless') throw new Error(`Unknown provider: ${providerId}`);
 
-    const baseURL = this.buildUrl(`${providerId}/${modelId}`);
+    const upstreamApiKey = process.env[featherless.apiKeyEnvVar];
+    if (!upstreamApiKey) {
+      throw new Error(
+        `Missing ${featherless.apiKeyEnvVar} environment variable for upstream provider "${featherless.name}".`,
+      );
+    }
 
     return createOpenAICompatible({
-      name: providerId,
+      name: 'featherless',
       apiKey: upstreamApiKey,
-      baseURL,
+      baseURL: featherless.url,
     }).chatModel(modelId);
   }
 }
