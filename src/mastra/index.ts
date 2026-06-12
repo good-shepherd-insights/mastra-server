@@ -12,6 +12,9 @@ import {
 } from "@mastra/observability";
 import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
+import { researchManager } from "./agents/research-manager";
+import { operationsManager } from "./agents/operations-manager";
+import { qaManager } from "./agents/qa-manager";
 import { shellTool } from "./tools/shell-tool";
 import { registerApiRoute, MastraAuthProvider } from "@mastra/core/server";
 
@@ -43,7 +46,7 @@ export const mastra = new Mastra({
   tools: { shellTool },
   mcpServers: {},
   workflows: { weatherWorkflow },
-  agents: { weatherAgent, builderAgent },
+  agents: { weatherAgent, builderAgent, researchManager, operationsManager, qaManager },
   scorers: {
     toolCallAppropriatenessScorer,
     completenessScorer,
