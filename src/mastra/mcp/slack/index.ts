@@ -18,7 +18,7 @@ const REDIRECT_URL =
 const SLACK_BOT_SCOPE_STRING = "canvases:read canvases:write lists:read lists:write remote_files:read";
 
 const oauthStorage = new LibSQLOAuthStorage("slack-mcp", {
-  url: process.env.SLACK_OAUTH_DATABASE_URL ?? `file:${import.meta.dir}/../../../../mastra-oauth.db`,
+  url: process.env.SLACK_OAUTH_DATABASE_URL ?? "file:./mastra-oauth.db",
   authToken: process.env.SLACK_OAUTH_DATABASE_AUTH_TOKEN,
 });
 

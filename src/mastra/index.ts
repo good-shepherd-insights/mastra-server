@@ -25,7 +25,7 @@ export const mastra: Mastra = new Mastra({
   agents: { researchManager, operationsManager, qaManager },
   storage: new LibSQLStore({
     id: "mastra-storage",
-    url: `file:${import.meta.dir}/../../mastra.db`,
+    url: "file:./mastra.db",
   }),
   logger: new PinoLogger({
     name: "Mastra",
