@@ -1,5 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 import { createSlackAdapter } from '@chat-adapter/slack';
+import { createTelegramAdapter } from '@chat-adapter/telegram';
 
 export const qaManager = new Agent({
   id: 'qa-manager',
@@ -19,6 +20,16 @@ When responding:
             slack: createSlackAdapter({
               botToken: process.env.QA_MANAGER_SLACK_BOT_TOKEN,
               signingSecret: process.env.QA_MANAGER_SLACK_SIGNING_SECRET,
+            }),
+          }
+        : {}),
+      ...(process.env.QA_MANAGER_TELEGRAM_BOT_TOKEN
+        ? {
+            telegram: createTelegramAdapter({
+              botToken: process.env.QA_MANAGER_TELEGRAM_BOT_TOKEN,
+              ...(process.env.QA_MANAGER_TELEGRAM_SECRET_TOKEN
+                ? { secretToken: process.env.QA_MANAGER_TELEGRAM_SECRET_TOKEN }
+                : {}),
             }),
           }
         : {}),
