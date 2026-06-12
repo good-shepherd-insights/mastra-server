@@ -32,7 +32,6 @@
     "@mastra/observability": "^1.14.1",
     "@mastra/stagehand": "^0.2.4",
     "playwright-core": "^1.60.0",
-    "yaml": "^2.9.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

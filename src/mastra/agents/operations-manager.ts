@@ -2,12 +2,12 @@ import { Agent } from '@mastra/core/agent';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { createTelegramAdapter } from '@chat-adapter/telegram';
 import { AgentId, DEFAULT_AGENT_MODEL } from '../config/index.js';
-import { loadPrompt } from './prompts/loader.js';
+import prompt from './prompts/operations-manager.yaml';
 
 export const operationsManager = new Agent({
   id: AgentId.OPERATIONS_MANAGER,
   name: 'Operations Manager',
-  instructions: loadPrompt(AgentId.OPERATIONS_MANAGER),
+  instructions: prompt.instructions,
   model: DEFAULT_AGENT_MODEL,
   channels: {
     adapters: {
