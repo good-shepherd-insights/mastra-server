@@ -24,6 +24,7 @@ export const mastra: Mastra = new Mastra({
   tools: { shellTool },
   agents: { researchManager, operationsManager, qaManager },
   storage: new PostgresStore({
+    id: "mastra-storage",
     connectionString: process.env.DATABASE_URL!,
   }),
   logger: new PinoLogger({
