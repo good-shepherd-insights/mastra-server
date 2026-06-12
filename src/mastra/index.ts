@@ -14,20 +14,7 @@ import { researchManager } from "./agents/research-manager";
 import { operationsManager } from "./agents/operations-manager";
 import { qaManager } from "./agents/qa-manager";
 import { shellTool } from "./tools/shell-tool";
-import { registerApiRoute, MastraAuthProvider } from "@mastra/core/server";
-
-class ApiKeyAuth extends MastraAuthProvider<{ id: string }> {
-  constructor() {
-    super({ name: 'api-key' });
-  }
-  async authenticateToken(token: string) {
-    const key = process.env.AUTH_GATEWAY_API_KEY;
-    return key && token === key ? { id: 'service' } : null;
-  }
-  async authorizeUser() {
-    return true;
-  }
-}
+import { registerApiRoute, SimpleAuth } from "@mastra/core/server";
 
 import { startOAuthFlow, completeOAuth, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
@@ -49,7 +36,15 @@ export const mastra = new Mastra({
     level: "info",
   }),
   server: {
-    auth: new ApiKeyAuth(),
+    auth: new SimpleAuth({
+      tokens: {
+        [process.env.AUTH_GATEWAY_API_KEY!]: {
+          id: 'service',
+          name: 'Service',
+          role: 'admin',
+        },
+      },
+    }),
     apiRoutes: [
       registerApiRoute("/oauth/authorize", {
         method: "GET",
