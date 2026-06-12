@@ -5,3 +5,4 @@ node_modules/
 mastra.db*
 mastra-oauth.db*
 src/mastra/public/mastra-oauth.db*
+package-lock.json
