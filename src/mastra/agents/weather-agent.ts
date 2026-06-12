@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { ProviderHistoryCompat } from '@mastra/core/processors';
 import { Memory } from '@mastra/memory';
 import { weatherTool } from '../tools/weather-tool';
 import { scorers } from '../scorers/weather-scorer';
@@ -20,12 +21,8 @@ export const weatherAgent = new Agent({
 
       Use the weatherTool to fetch current weather data.
 `,
-  model: {
-    id: 'featherless/zai-org/GLM-5.1',
-    providerId: 'featherless',
-    modelId: 'zai-org/GLM-5.1',
-    apiKey: process.env.FEATHERLESS_API_KEY!,
-  },
+  model: 'auth-gateway/featherless/zai-org/GLM-5.1',
+  inputProcessors: [new ProviderHistoryCompat()],
   tools: { weatherTool },
   scorers: {
     toolCallAppropriateness: {

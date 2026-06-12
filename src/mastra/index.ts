@@ -3,9 +3,7 @@ import { PinoLogger } from "@mastra/loggers";
 import { LibSQLStore } from "@mastra/libsql";
 import { MastraEditor } from "@mastra/editor";
 import { createBuilderAgent } from "@mastra/editor/ee";
-import { MastraModelGateway } from "@mastra/core/llm";
-import type { ProviderConfig } from "@mastra/core/llm";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { authGateway } from "./gateways";
 import {
   Observability,
   DefaultExporter,
@@ -15,7 +13,20 @@ import {
 import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
-import { registerApiRoute } from "@mastra/core/server";
+import { registerApiRoute, MastraAuthProvider } from "@mastra/core/server";
+
+class ApiKeyAuth extends MastraAuthProvider<{ id: string }> {
+  constructor() {
+    super({ name: 'api-key' });
+  }
+  async authenticateToken(token: string) {
+    const key = process.env.AUTH_GATEWAY_API_KEY;
+    return key && token === key ? { id: 'service' } : null;
+  }
+  async authorizeUser() {
+    return true;
+  }
+}
 import { startOAuthFlow, completeOAuth, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 import {
@@ -24,71 +35,11 @@ import {
   translationScorer,
 } from "./scorers/weather-scorer";
 
-// Featherless AI — OpenAI-compatible gateway
-const FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1";
-
-class FeatherlessGateway extends MastraModelGateway {
-  readonly id = "featherless" as const;
-  readonly name = "Featherless AI";
-
-  async fetchProviders(): Promise<Record<string, ProviderConfig>> {
-    return {
-      featherless: {
-        name: "Featherless AI",
-        models: ["zai-org/GLM-5.1"],
-        apiKeyEnvVar: "FEATHERLESS_API_KEY",
-        gateway: this.id,
-        url: FEATHERLESS_BASE_URL,
-      },
-    };
-  }
-
-  buildUrl(): string {
-    return FEATHERLESS_BASE_URL;
-  }
-
-  async getApiKey(): Promise<string> {
-    const apiKey = process.env.FEATHERLESS_API_KEY;
-    if (!apiKey) {
-      throw new Error("Missing FEATHERLESS_API_KEY environment variable");
-    }
-    return apiKey;
-  }
-
-  async resolveLanguageModel({
-    modelId,
-    providerId,
-    apiKey,
-  }: {
-    modelId: string;
-    providerId: string;
-    apiKey: string;
-  }) {
-    // Featherless expects the full model ID including the org prefix (e.g. "zai-org/GLM-5.1")
-    // Mastra's router may split gateway-qualified IDs like "featherless/zai-org/GLM-5.1"
-    // into providerId="zai-org" and modelId="GLM-5.1", so we need to rejoin them.
-    // But when called with an explicit modelId like "zai-org/GLM-5.1", it's already complete.
-    const fullModelId = modelId.includes('/') ? modelId : `${providerId}/${modelId}`;
-    return createOpenAICompatible({
-      name: providerId,
-      apiKey,
-      baseURL: FEATHERLESS_BASE_URL,
-    }).chatModel(fullModelId);
-  }
-}
-
-const featherlessGateway = new FeatherlessGateway();
-
 export const builderAgent = createBuilderAgent({
-  model: {
-    id: 'featherless/zai-org/GLM-5.1',
-    providerId: 'featherless',
-    modelId: 'zai-org/GLM-5.1',
-    apiKey: process.env.FEATHERLESS_API_KEY!,
-  },
+  model: 'auth-gateway/featherless/zai-org/GLM-5.1',
 });
 export const mastra = new Mastra({
-  gateways: { featherless: featherlessGateway },
+  gateways: { 'auth-gateway': authGateway },
   tools: { shellTool },
   mcpServers: {},
   workflows: { weatherWorkflow },
@@ -108,6 +59,7 @@ export const mastra = new Mastra({
     level: "info",
   }),
   server: {
+    auth: new ApiKeyAuth(),
     apiRoutes: [
       // Starts the OAuth flow — redirects the user to Slack's authorization page.
       registerApiRoute("/oauth/authorize", {
@@ -164,10 +116,7 @@ export const mastra = new Mastra({
       configuration: {
         agent: {
           models: {
-            allowed: [
-              { provider: "featherless", modelId: "zai-org/GLM-5.1", kind: "custom" },
-            ],
-            default: { provider: "featherless", modelId: "zai-org/GLM-5.1", kind: "custom" },
+            default: { kind: 'custom', provider: 'featherless', modelId: 'zai-org/GLM-5.1' },
           },
           tools: { allowed: ["get-weather", "execute-shell"] },
           agents: { allowed: ["weather-agent"] },
