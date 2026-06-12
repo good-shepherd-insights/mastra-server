@@ -13,8 +13,11 @@ import { authGateway } from "./gateways/index.js";
 import { researchManager, operationsManager, qaManager } from "./agents/index.js";
 import { shellTool } from "./tools/index.js";
 import { AgentId, ProviderId, PROVIDER_REGISTRY } from "./config/index.js";
-import { startSlackMCPServer } from "./mcp/slack-mcp-client.js";
-import { createOAuthRoutes } from "./routes/oauth.js";
+import { startSlackMCPServer, slackOAuthHandlers } from "./mcp/slack/index.js";
+import { createMCPOAuthRoutes } from "./mcp/oauth/routes.js";
+
+const authToken = process.env.AUTH_GATEWAY_API_KEY;
+if (!authToken) throw new Error('AUTH_GATEWAY_API_KEY environment variable is required.');
 
 export const mastra: Mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
@@ -31,14 +34,14 @@ export const mastra: Mastra = new Mastra({
   server: {
     auth: new SimpleAuth({
       tokens: {
-        [process.env.AUTH_GATEWAY_API_KEY!]: {
+        [authToken]: {
           id: 'service',
           name: 'Service',
           role: 'admin',
         },
       },
     }),
-    apiRoutes: createOAuthRoutes(() => mastra),
+    apiRoutes: createMCPOAuthRoutes('slack', slackOAuthHandlers, () => mastra),
   },
   editor: new MastraEditor({
     builder: {

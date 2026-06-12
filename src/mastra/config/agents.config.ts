@@ -6,5 +6,10 @@ export enum AgentId {
   QA_MANAGER = 'qa-manager',
 }
 
+const _featherlessModels = PROVIDER_REGISTRY[ProviderId.FEATHERLESS].models;
+if (_featherlessModels.length === 0) {
+  throw new Error('PROVIDER_REGISTRY[featherless].models is empty — at least one model must be defined.');
+}
+
 export const DEFAULT_AGENT_MODEL =
-  `auth-gateway/${ProviderId.FEATHERLESS}/${PROVIDER_REGISTRY[ProviderId.FEATHERLESS].models[0]}` as const;
+  `auth-gateway/${ProviderId.FEATHERLESS}/${_featherlessModels[0]}` as const;

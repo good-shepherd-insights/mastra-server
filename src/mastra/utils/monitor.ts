@@ -7,8 +7,12 @@ export const monitor = {
   },
 
   authEvent(event: 'ok' | 'rejected', detail?: string): void {
+    if (event === 'rejected') {
+      console.warn(`[auth] rejected${detail ? `: ${detail}` : ''}`);
+      return;
+    }
     if (!IS_DEBUG) return;
-    console.debug(`[auth] ${event}${detail ? `: ${detail}` : ''}`);
+    console.debug(`[auth] ok${detail ? `: ${detail}` : ''}`);
   },
 
   slackMcp(event: string, detail?: string): void {

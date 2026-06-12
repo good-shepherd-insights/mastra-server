@@ -1,7 +1,7 @@
 import { MastraModelGateway, type ProviderConfig, type GatewayLanguageModel } from '@mastra/core/llm';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { PROVIDER_REGISTRY, GATEWAY_PROVIDERS, type GatewayProviderId } from '../config/index.js';
 import { monitor } from '../utils/monitor.js';
+import { buildProviderConfigs, resolveProviderUrl, assertGatewayProvider, getUpstreamApiKey } from './utils/providers.js';
+import { ProviderClientCache } from './utils/client-cache.js';
 
 const GATEWAY_API_KEY_ENV = 'AUTH_GATEWAY_API_KEY';
 
@@ -9,20 +9,15 @@ export class AuthGateway extends MastraModelGateway {
   readonly id = 'auth-gateway' as const;
   readonly name = 'Auth Gateway';
 
+  private cachedProviders?: Record<string, ProviderConfig>;
+  private readonly clientCache = new ProviderClientCache();
+
   async fetchProviders(): Promise<Record<string, ProviderConfig>> {
-    return Object.fromEntries(
-      GATEWAY_PROVIDERS.map((id) => {
-        const p = PROVIDER_REGISTRY[id];
-        return [id, { name: p.name, models: p.models, apiKeyEnvVar: p.apiKeyEnvVar, gateway: this.id, url: p.url }];
-      }),
-    );
+    return (this.cachedProviders ??= buildProviderConfigs(this.id));
   }
 
   buildUrl(modelId: string): string {
-    const providerId = modelId.split('/')[0] as GatewayProviderId;
-    const provider = PROVIDER_REGISTRY[providerId];
-    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
-    return provider.url;
+    return resolveProviderUrl(modelId);
   }
 
   async getApiKey(_modelId: string): Promise<string> {
@@ -45,25 +40,11 @@ export class AuthGateway extends MastraModelGateway {
       throw new Error('Invalid Auth Gateway API key.');
     }
 
-    if (!(GATEWAY_PROVIDERS as readonly string[]).includes(providerId)) {
-      throw new Error(`Provider '${providerId}' is not configured for the auth gateway.`);
-    }
-    const provider = PROVIDER_REGISTRY[providerId as GatewayProviderId];
-
-    const upstreamApiKey = process.env[provider.apiKeyEnvVar];
-    if (!upstreamApiKey) {
-      throw new Error(
-        `Missing ${provider.apiKeyEnvVar} environment variable for upstream provider "${provider.name}".`,
-      );
-    }
+    assertGatewayProvider(providerId);
 
     monitor.gatewayResolve(providerId, modelId);
 
-    return createOpenAICompatible({
-      name: providerId,
-      apiKey: upstreamApiKey,
-      baseURL: provider.url,
-    }).chatModel(modelId);
+    return this.clientCache.get(providerId, getUpstreamApiKey(providerId)).chatModel(modelId);
   }
 }
 

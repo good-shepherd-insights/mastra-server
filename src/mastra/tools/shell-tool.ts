@@ -14,6 +14,13 @@ export const shellTool = createTool({
       .describe(
         "Working directory to run the command in. Defaults to the project root if not specified.",
       ),
+    timeout: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        "Maximum time in milliseconds to wait for the command. If exceeded the process is killed and exitCode will be non-zero.",
+      ),
   }),
   outputSchema: z.object({
     stdout: z.string().describe("Standard output from the command"),
@@ -28,12 +35,12 @@ export const shellTool = createTool({
       openWorldHint: true,
     },
   },
-  execute: async ({ command, cwd }, { abortSignal }) => {
+  execute: async ({ command, cwd, timeout }, { abortSignal }) => {
     if (abortSignal?.aborted) {
       throw new Error("Shell command was aborted before execution");
     }
     return new Promise((resolve, reject) => {
-      const child = exec(command, { cwd }, (error, stdout, stderr) => {
+      const child = exec(command, { cwd, timeout }, (error, stdout, stderr) => {
         resolve({
           stdout: stdout ?? "",
           stderr: stderr ?? "",
