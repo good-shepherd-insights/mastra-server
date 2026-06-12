@@ -14,10 +14,14 @@ When responding:
   model: 'auth-gateway/featherless/zai-org/GLM-5.1',
   channels: {
     adapters: {
-      slack: createSlackAdapter({
-        botToken: process.env.RESEARCH_MANAGER_SLACK_BOT_TOKEN,
-        signingSecret: process.env.RESEARCH_MANAGER_SLACK_SIGNING_SECRET,
-      }),
+      ...(process.env.RESEARCH_MANAGER_SLACK_BOT_TOKEN && process.env.RESEARCH_MANAGER_SLACK_SIGNING_SECRET
+        ? {
+            slack: createSlackAdapter({
+              botToken: process.env.RESEARCH_MANAGER_SLACK_BOT_TOKEN,
+              signingSecret: process.env.RESEARCH_MANAGER_SLACK_SIGNING_SECRET,
+            }),
+          }
+        : {}),
     },
   },
 });
