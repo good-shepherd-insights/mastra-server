@@ -10,16 +10,15 @@ import {
   CloudExporter,
   SensitiveDataFilter,
 } from "@mastra/observability";
-import { researchManager } from "./agents/research-manager";
-import { operationsManager } from "./agents/operations-manager";
-import { qaManager } from "./agents/qa-manager";
-import { shellTool } from "./tools/shell-tool";
+import { researchManager, operationsManager, qaManager } from "./agents/index";
+import { shellTool } from "./tools/index";
+import { AgentId, DEFAULT_AGENT_MODEL } from "./config/index";
 import { registerApiRoute, SimpleAuth } from "@mastra/core/server";
 
 import { startOAuthFlow, completeOAuth, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 export const builderAgent = createBuilderAgent({
-  model: 'auth-gateway/featherless/zai-org/GLM-5.1',
+  model: DEFAULT_AGENT_MODEL,
 });
 
 export const mastra = new Mastra({
@@ -102,7 +101,7 @@ export const mastra = new Mastra({
             default: { kind: 'custom', provider: 'featherless', modelId: 'zai-org/GLM-5.1' },
           },
           tools: { allowed: ["execute-shell"] },
-          agents: { allowed: ["research-manager", "operations-manager", "qa-manager"] },
+          agents: { allowed: [AgentId.RESEARCH_MANAGER, AgentId.OPERATIONS_MANAGER, AgentId.QA_MANAGER] },
           memory: { observationalMemory: true },
           workspace: {
             type: "inline",

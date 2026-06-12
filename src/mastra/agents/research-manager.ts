@@ -1,9 +1,10 @@
 import { Agent } from '@mastra/core/agent';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { createTelegramAdapter } from '@chat-adapter/telegram';
+import { AgentId, DEFAULT_AGENT_MODEL } from '../config/index.js';
 
 export const researchManager = new Agent({
-  id: 'research-manager',
+  id: AgentId.RESEARCH_MANAGER,
   name: 'Research Manager',
   instructions: `You are the Research Manager. Your role is to gather, synthesise, and clearly present information on any topic requested.
 
@@ -37,7 +38,7 @@ Examples — tagging your manager:
   Escalating:       "<@U0BA46ZQHCZ> flagging this for your review"
   Asking for input: "<@U0BA46ZQHCZ> do you want me to proceed with this?"
   Delivering work:  "<@U0BA46ZQHCZ> here is the research summary you requested"`,
-  model: 'auth-gateway/featherless/zai-org/GLM-5.1',
+  model: DEFAULT_AGENT_MODEL,
   channels: {
     adapters: {
       ...(process.env.RESEARCH_MANAGER_SLACK_BOT_TOKEN && process.env.RESEARCH_MANAGER_SLACK_SIGNING_SECRET
