@@ -5,7 +5,7 @@ import {
   createSimpleTokenProvider,
   auth,
 } from "@mastra/mcp";
-import { createLibSQLStorage } from "../oauth/storage.js";
+import { LibSQLOAuthStorage } from "../oauth/storage.js";
 import { monitor } from "../../utils/monitor.js";
 import type { MCPOAuthHandlers } from "../oauth/routes.js";
 
@@ -17,11 +17,10 @@ const REDIRECT_URL =
 // These must match the scopes configured in your Slack app manifest under oauth_config.scopes.bot.
 const SLACK_BOT_SCOPE_STRING = "canvases:read canvases:write lists:read lists:write remote_files:read";
 
-const oauthStorage = createLibSQLStorage(
-  process.env.SLACK_OAUTH_DATABASE_URL ?? "file:./mastra-oauth.db",
-  process.env.SLACK_OAUTH_DATABASE_AUTH_TOKEN,
-  "slack-mcp",
-);
+const oauthStorage = new LibSQLOAuthStorage("slack-mcp", {
+  url: process.env.SLACK_OAUTH_DATABASE_URL ?? "file:./mastra-oauth.db",
+  authToken: process.env.SLACK_OAUTH_DATABASE_AUTH_TOKEN,
+});
 
 let pendingAuthUrl: string | null = null;
 
