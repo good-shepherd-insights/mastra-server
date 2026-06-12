@@ -13,7 +13,20 @@ import {
 import { weatherWorkflow } from "./workflows/weather-workflow";
 import { weatherAgent } from "./agents/weather-agent";
 import { shellTool } from "./tools/shell-tool";
-import { registerApiRoute } from "@mastra/core/server";
+import { registerApiRoute, MastraAuthProvider } from "@mastra/core/server";
+
+class ApiKeyAuth extends MastraAuthProvider<{ id: string }> {
+  constructor() {
+    super({ name: 'api-key' });
+  }
+  async authenticateToken(token: string) {
+    const key = process.env.AUTH_GATEWAY_API_KEY;
+    return key && token === key ? { id: 'service' } : null;
+  }
+  async authorizeUser() {
+    return true;
+  }
+}
 import { startOAuthFlow, completeOAuth, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 import {
@@ -46,6 +59,7 @@ export const mastra = new Mastra({
     level: "info",
   }),
   server: {
+    auth: new ApiKeyAuth(),
     apiRoutes: [
       // Starts the OAuth flow — redirects the user to Slack's authorization page.
       registerApiRoute("/oauth/authorize", {
