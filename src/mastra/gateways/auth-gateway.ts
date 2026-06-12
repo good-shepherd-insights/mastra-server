@@ -1,7 +1,7 @@
 import { MastraModelGateway, type ProviderConfig, type GatewayLanguageModel } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { PROVIDER_REGISTRY, GATEWAY_PROVIDERS, type GatewayProviderId } from '../config/index.js';
-import { monitor } from '../monitor/monitor.js';
+import { monitor } from '../utils/monitor.js';
 
 const GATEWAY_API_KEY_ENV = 'AUTH_GATEWAY_API_KEY';
 
