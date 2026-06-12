@@ -45,8 +45,10 @@ export class AuthGateway extends MastraModelGateway {
       throw new Error('Invalid Auth Gateway API key.');
     }
 
+    if (!(GATEWAY_PROVIDERS as readonly string[]).includes(providerId)) {
+      throw new Error(`Provider '${providerId}' is not configured for the auth gateway.`);
+    }
     const provider = PROVIDER_REGISTRY[providerId as GatewayProviderId];
-    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
 
     const upstreamApiKey = process.env[provider.apiKeyEnvVar];
     if (!upstreamApiKey) {

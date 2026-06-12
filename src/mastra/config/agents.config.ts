@@ -1,4 +1,4 @@
-import { ProviderId } from './providers.config.js';
+import { ProviderId, PROVIDER_REGISTRY } from './providers.config.js';
 
 export enum AgentId {
   RESEARCH_MANAGER = 'research-manager',
@@ -7,5 +7,5 @@ export enum AgentId {
   BUILDER = 'builder',
 }
 
-/** Default gateway model string used by all manager agents. */
-export const DEFAULT_AGENT_MODEL = `auth-gateway/${ProviderId.FEATHERLESS}/zai-org/GLM-5.1` as const;
+export const DEFAULT_AGENT_MODEL =
+  `auth-gateway/${ProviderId.FEATHERLESS}/${PROVIDER_REGISTRY[ProviderId.FEATHERLESS].models[0]}` as const;
