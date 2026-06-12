@@ -12,7 +12,7 @@ import {
 } from "@mastra/observability";
 import { researchManager, operationsManager, qaManager } from "./agents/index";
 import { shellTool } from "./tools/index";
-import { AgentId, DEFAULT_AGENT_MODEL } from "./config/index";
+import { AgentId, DEFAULT_AGENT_MODEL, ProviderId } from "./config/index";
 import { registerApiRoute, SimpleAuth } from "@mastra/core/server";
 
 import { startOAuthFlow, completeOAuth, startSlackMCPServer } from "./mcp/slack-mcp-client";
@@ -98,7 +98,7 @@ export const mastra = new Mastra({
       configuration: {
         agent: {
           models: {
-            default: { kind: 'custom', provider: 'featherless', modelId: 'zai-org/GLM-5.1' },
+            default: { kind: 'custom', provider: ProviderId.FEATHERLESS, modelId: 'zai-org/GLM-5.1' },
           },
           tools: { allowed: ["execute-shell"] },
           agents: { allowed: [AgentId.RESEARCH_MANAGER, AgentId.OPERATIONS_MANAGER, AgentId.QA_MANAGER] },
