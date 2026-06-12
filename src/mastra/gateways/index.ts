@@ -1,1 +1,1 @@
-export { authGateway } from './auth-gateway';
+export { authGateway } from './auth-gateway.js';
