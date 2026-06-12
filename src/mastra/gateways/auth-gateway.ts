@@ -1,8 +1,11 @@
 import { MastraModelGateway, type ProviderConfig, type GatewayLanguageModel } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { featherless } from './featherless';
+import { pioneer } from './pioneer';
 
 const GATEWAY_API_KEY_ENV = 'AUTH_GATEWAY_API_KEY';
+
+const providers = { featherless, pioneer } as const;
 
 export class AuthGateway extends MastraModelGateway {
   readonly id = 'auth-gateway' as const;
@@ -17,13 +20,21 @@ export class AuthGateway extends MastraModelGateway {
         gateway: this.id,
         url: featherless.url,
       },
+      pioneer: {
+        name: pioneer.name,
+        models: pioneer.models,
+        apiKeyEnvVar: pioneer.apiKeyEnvVar,
+        gateway: this.id,
+        url: pioneer.url,
+      },
     };
   }
 
   buildUrl(modelId: string): string {
     const providerId = modelId.split('/')[0];
-    if (providerId !== 'featherless') throw new Error(`Unknown provider: ${providerId}`);
-    return featherless.url;
+    const provider = providers[providerId as keyof typeof providers];
+    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
+    return provider.url;
   }
 
   async getApiKey(_modelId: string): Promise<string> {
@@ -47,19 +58,20 @@ export class AuthGateway extends MastraModelGateway {
       throw new Error('Invalid Auth Gateway API key.');
     }
 
-    if (providerId !== 'featherless') throw new Error(`Unknown provider: ${providerId}`);
+    const provider = providers[providerId as keyof typeof providers];
+    if (!provider) throw new Error(`Unknown provider: ${providerId}`);
 
-    const upstreamApiKey = process.env[featherless.apiKeyEnvVar];
+    const upstreamApiKey = process.env[provider.apiKeyEnvVar];
     if (!upstreamApiKey) {
       throw new Error(
-        `Missing ${featherless.apiKeyEnvVar} environment variable for upstream provider "${featherless.name}".`,
+        `Missing ${provider.apiKeyEnvVar} environment variable for upstream provider "${provider.name}".`,
       );
     }
 
     return createOpenAICompatible({
-      name: 'featherless',
+      name: providerId,
       apiKey: upstreamApiKey,
-      baseURL: featherless.url,
+      baseURL: provider.url,
     }).chatModel(modelId);
   }
 }
