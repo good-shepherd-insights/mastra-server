@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { createTelegramAdapter } from '@chat-adapter/telegram';
 import { AgentId, DEFAULT_AGENT_MODEL } from '../config/index.js';
-import prompt from './prompts/qa-manager.yaml';
+import prompt from './instructions/qa-manager.yaml';
 
 export const qaManager = new Agent({
   id: AgentId.QA_MANAGER,
