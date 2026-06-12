@@ -4,7 +4,6 @@ export enum AgentId {
   RESEARCH_MANAGER = 'research-manager',
   OPERATIONS_MANAGER = 'operations-manager',
   QA_MANAGER = 'qa-manager',
-  BUILDER = 'builder',
 }
 
 export const DEFAULT_AGENT_MODEL =

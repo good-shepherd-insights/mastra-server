@@ -12,14 +12,13 @@ import {
 import { authGateway } from "./gateways/index.js";
 import { researchManager, operationsManager, qaManager } from "./agents/index.js";
 import { shellTool } from "./tools/index.js";
-import { AgentId, ProviderId } from "./config/index.js";
+import { AgentId, ProviderId, PROVIDER_REGISTRY } from "./config/index.js";
 import { startSlackMCPServer } from "./mcp/slack-mcp-client.js";
 import { createOAuthRoutes } from "./routes/oauth.js";
 
 export const mastra: Mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
   tools: { shellTool },
-  mcpServers: {},
   agents: { researchManager, operationsManager, qaManager },
   storage: new LibSQLStore({
     id: "mastra-storage",
@@ -47,7 +46,7 @@ export const mastra: Mastra = new Mastra({
       configuration: {
         agent: {
           models: {
-            default: { kind: 'custom', provider: ProviderId.FEATHERLESS, modelId: 'zai-org/GLM-5.1' },
+            default: { kind: 'custom', provider: ProviderId.FEATHERLESS, modelId: PROVIDER_REGISTRY[ProviderId.FEATHERLESS].models[0] },
           },
           tools: { allowed: ["execute-shell"] },
           agents: { allowed: [AgentId.RESEARCH_MANAGER, AgentId.OPERATIONS_MANAGER, AgentId.QA_MANAGER] },

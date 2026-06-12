@@ -6,13 +6,13 @@ export const monitor = {
     console.debug(`[gateway] resolving ${providerId}/${modelId}`);
   },
 
-  adapterRegistered(agentId: string, channel: string): void {
-    if (!IS_DEBUG) return;
-    console.debug(`[adapter] ${agentId} → ${channel} registered`);
-  },
-
   authEvent(event: 'ok' | 'rejected', detail?: string): void {
     if (!IS_DEBUG) return;
     console.debug(`[auth] ${event}${detail ? `: ${detail}` : ''}`);
+  },
+
+  slackMcp(event: string, detail?: string): void {
+    if (!IS_DEBUG) return;
+    console.debug(`[slack-mcp] ${event}${detail ? `: ${detail}` : ''}`);
   },
 };

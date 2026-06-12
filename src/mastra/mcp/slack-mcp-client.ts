@@ -1,5 +1,6 @@
 import { MCPClient, MCPOAuthClientProvider, MCPServer, OAuthStorage, createSimpleTokenProvider, auth } from "@mastra/mcp";
 import { createClient, type Client } from "@libsql/client";
+import { monitor } from "../utils/monitor.js";
 
 const SLACK_MCP_URL = "https://mcp.slack.com/mcp";
 const REDIRECT_URL =
@@ -86,7 +87,7 @@ const oauthProvider = new MCPOAuthClientProvider({
   // Per Mastra docs: onRedirectToAuthorization handles sending user to Slack's auth page
   onRedirectToAuthorization: (url) => {
     pendingAuthUrl = url.toString();
-    console.log(`[Slack MCP] OAuth required. Visit: ${url}`);
+    monitor.slackMcp('oauth-redirect', url.toString());
   },
 });
 
@@ -104,7 +105,7 @@ const authProvider = savedToken
   : oauthProvider;
 
 if (savedToken) {
-  console.log("[Slack MCP] Found saved token — reusing session.");
+  monitor.slackMcp('token-reused');
 }
 
 // Per Mastra docs Pattern 2: MCPClient with url + authProvider
@@ -140,7 +141,9 @@ export async function startSlackMCPServer(mastra: import("@mastra/core/mastra").
       version: "1.0.0",
       tools: slackTools,
     }));
-  } catch {}
+  } catch (err) {
+    monitor.slackMcp('register-failed', err instanceof Error ? err.message : String(err));
+  }
 }
 
 export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
@@ -158,7 +161,7 @@ export async function completeOAuth(code: string): Promise<"AUTHORIZED"> {
   }
 
   pendingAuthUrl = null;
-  console.log("[Slack MCP] OAuth complete. Tokens saved to persistent storage.");
+  monitor.slackMcp('oauth-complete');
   return result;
 }
 
