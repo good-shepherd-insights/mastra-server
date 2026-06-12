@@ -2,7 +2,6 @@ import { Mastra } from "@mastra/core/mastra";
 import { PinoLogger } from "@mastra/loggers";
 import { LibSQLStore } from "@mastra/libsql";
 import { MastraEditor } from "@mastra/editor";
-import { createBuilderAgent } from "@mastra/editor/ee";
 import { authGateway } from "./gateways";
 import {
   Observability,
@@ -12,20 +11,16 @@ import {
 } from "@mastra/observability";
 import { researchManager, operationsManager, qaManager } from "./agents/index";
 import { shellTool } from "./tools/index";
-import { AgentId, DEFAULT_AGENT_MODEL, ProviderId } from "./config/index";
+import { AgentId, ProviderId } from "./config/index";
 import { registerApiRoute, SimpleAuth } from "@mastra/core/server";
 
 import { startOAuthFlow, completeOAuth, startSlackMCPServer } from "./mcp/slack-mcp-client";
-
-export const builderAgent = createBuilderAgent({
-  model: DEFAULT_AGENT_MODEL,
-});
 
 export const mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
   tools: { shellTool },
   mcpServers: {},
-  agents: { builderAgent, researchManager, operationsManager, qaManager },
+  agents: { researchManager, operationsManager, qaManager },
   storage: new LibSQLStore({
     id: "mastra-storage",
     url: "file:./mastra.db",
@@ -103,16 +98,6 @@ export const mastra = new Mastra({
           tools: { allowed: ["execute-shell"] },
           agents: { allowed: [AgentId.RESEARCH_MANAGER, AgentId.OPERATIONS_MANAGER, AgentId.QA_MANAGER] },
           memory: { observationalMemory: true },
-          workspace: {
-            type: "inline",
-            config: {
-              name: "builder-workspace",
-              filesystem: {
-                provider: "local",
-                config: { basePath: "./agent-files" },
-              },
-            },
-          },
         },
       },
     },
