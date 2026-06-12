@@ -1,6 +1,6 @@
 import { Mastra } from "@mastra/core/mastra";
 import { PinoLogger } from "@mastra/loggers";
-import { LibSQLStore } from "@mastra/libsql";
+import { PostgresStore } from "@mastra/pg";
 import { MastraEditor } from "@mastra/editor";
 import { SimpleAuth } from "@mastra/core/server";
 import {
@@ -23,9 +23,8 @@ export const mastra: Mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
   tools: { shellTool },
   agents: { researchManager, operationsManager, qaManager },
-  storage: new LibSQLStore({
-    id: "mastra-storage",
-    url: "file:./mastra.db",
+  storage: new PostgresStore({
+    connectionString: process.env.DATABASE_URL!,
   }),
   logger: new PinoLogger({
     name: "Mastra",
