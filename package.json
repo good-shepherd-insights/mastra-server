@@ -34,6 +34,9 @@
     "playwright-core": "^1.60.0",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "@mastra/core": "1.42.0"
+  },
   "devDependencies": {
     "@types/node": "^25.2.2",
     "@types/pg": "^8.20.0",
