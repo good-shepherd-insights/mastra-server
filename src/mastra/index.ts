@@ -10,8 +10,6 @@ import {
   CloudExporter,
   SensitiveDataFilter,
 } from "@mastra/observability";
-import { weatherWorkflow } from "./workflows/weather-workflow";
-import { weatherAgent } from "./agents/weather-agent";
 import { researchManager } from "./agents/research-manager";
 import { operationsManager } from "./agents/operations-manager";
 import { qaManager } from "./agents/qa-manager";
@@ -30,31 +28,20 @@ class ApiKeyAuth extends MastraAuthProvider<{ id: string }> {
     return true;
   }
 }
-import { startOAuthFlow, completeOAuth, getSlackToolsets, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
-import {
-  toolCallAppropriatenessScorer,
-  completenessScorer,
-  translationScorer,
-} from "./scorers/weather-scorer";
+import { startOAuthFlow, completeOAuth, startSlackMCPServer } from "./mcp/slack-mcp-client";
 
 export const builderAgent = createBuilderAgent({
   model: 'auth-gateway/featherless/zai-org/GLM-5.1',
 });
+
 export const mastra = new Mastra({
   gateways: { 'auth-gateway': authGateway },
   tools: { shellTool },
   mcpServers: {},
-  workflows: { weatherWorkflow },
-  agents: { weatherAgent, builderAgent, researchManager, operationsManager, qaManager },
-  scorers: {
-    toolCallAppropriatenessScorer,
-    completenessScorer,
-    translationScorer,
-  },
+  agents: { builderAgent, researchManager, operationsManager, qaManager },
   storage: new LibSQLStore({
     id: "mastra-storage",
-    // stores observability, scores, ... into persistent file storage
     url: "file:./mastra.db",
   }),
   logger: new PinoLogger({
@@ -64,7 +51,6 @@ export const mastra = new Mastra({
   server: {
     auth: new ApiKeyAuth(),
     apiRoutes: [
-      // Starts the OAuth flow — redirects the user to Slack's authorization page.
       registerApiRoute("/oauth/authorize", {
         method: "GET",
         requiresAuth: false,
@@ -83,7 +69,6 @@ export const mastra = new Mastra({
           }
         },
       }),
-      // Handles the OAuth callback from Slack — exchanges the code for tokens.
       registerApiRoute("/oauth/callback", {
         method: "GET",
         requiresAuth: false,
@@ -121,9 +106,8 @@ export const mastra = new Mastra({
           models: {
             default: { kind: 'custom', provider: 'featherless', modelId: 'zai-org/GLM-5.1' },
           },
-          tools: { allowed: ["get-weather", "execute-shell"] },
-          agents: { allowed: ["weather-agent"] },
-          workflows: { allowed: ["weather-workflow"] },
+          tools: { allowed: ["execute-shell"] },
+          agents: { allowed: ["research-manager", "operations-manager", "qa-manager"] },
           memory: { observationalMemory: true },
           workspace: {
             type: "inline",
@@ -144,11 +128,11 @@ export const mastra = new Mastra({
       default: {
         serviceName: "mastra",
         exporters: [
-          new DefaultExporter(), // Persists traces to storage for Mastra Studio
-          new CloudExporter(), // Sends traces to Mastra Cloud (if MASTRA_CLOUD_ACCESS_TOKEN is set)
+          new DefaultExporter(),
+          new CloudExporter(),
         ],
         spanOutputProcessors: [
-          new SensitiveDataFilter(), // Redacts sensitive data like passwords, tokens, keys
+          new SensitiveDataFilter(),
         ],
       },
     },
