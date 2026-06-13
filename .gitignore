@@ -6,3 +6,5 @@ mastra.db*
 mastra-oauth.db*
 src/mastra/public/
 package-lock.json
+CLAUDE.md
+REFACTOR(agent-independent-memory).md
