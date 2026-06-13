@@ -21,6 +21,7 @@
     "@ai-sdk/openai-compatible": "^2.0.49",
     "@browserbasehq/stagehand": "^3.5.0",
     "@chat-adapter/slack": "^4.30.0",
+    "@chat-adapter/state-pg": "^4.30.0",
     "@chat-adapter/telegram": "^4.30.0",
     "@mastra/core": "^1.42.0",
     "@mastra/editor": "^0.11.2",
