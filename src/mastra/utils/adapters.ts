@@ -42,7 +42,7 @@ export function buildChannelAdapters(envPrefix: string, agentId: string) {
         ? { slack: createSlackAdapter({ botToken: slackToken, signingSecret: slackSecret }) }
         : {}),
       ...(telegramToken
-        ? { telegram: createTelegramAdapter({ botToken: telegramToken }) }
+        ? { telegram: { adapter: createTelegramAdapter({ botToken: telegramToken }), toolDisplay: 'hidden' } }
         : {}),
     },
   };
