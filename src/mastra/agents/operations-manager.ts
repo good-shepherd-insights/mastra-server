@@ -8,5 +8,5 @@ export const operationsManager = new Agent({
   name: 'Operations Manager',
   instructions,
   model: DEFAULT_AGENT_MODEL,
-  channels: buildChannelAdapters('OPS_MANAGER'),
+  channels: buildChannelAdapters('OPS_MANAGER', AgentId.OPERATIONS_MANAGER),
 });

@@ -8,5 +8,5 @@ export const qaManager = new Agent({
   name: 'QA Manager',
   instructions,
   model: DEFAULT_AGENT_MODEL,
-  channels: buildChannelAdapters('QA_MANAGER'),
+  channels: buildChannelAdapters('QA_MANAGER', AgentId.QA_MANAGER),
 });

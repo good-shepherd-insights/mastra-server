@@ -8,5 +8,5 @@ export const researchManager = new Agent({
   name: 'Research Manager',
   instructions,
   model: DEFAULT_AGENT_MODEL,
-  channels: buildChannelAdapters('RESEARCH_MANAGER'),
+  channels: buildChannelAdapters('RESEARCH_MANAGER', AgentId.RESEARCH_MANAGER),
 });
