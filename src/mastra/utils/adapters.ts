@@ -5,7 +5,6 @@ export function buildChannelAdapters(envPrefix: string) {
   const slackToken = process.env[`${envPrefix}_SLACK_BOT_TOKEN`];
   const slackSecret = process.env[`${envPrefix}_SLACK_SIGNING_SECRET`];
   const telegramToken = process.env[`${envPrefix}_TELEGRAM_BOT_TOKEN`];
-  const telegramSecret = process.env[`${envPrefix}_TELEGRAM_SECRET_TOKEN`];
 
   return {
     adapters: {
@@ -13,12 +12,7 @@ export function buildChannelAdapters(envPrefix: string) {
         ? { slack: createSlackAdapter({ botToken: slackToken, signingSecret: slackSecret }) }
         : {}),
       ...(telegramToken
-        ? {
-            telegram: createTelegramAdapter({
-              botToken: telegramToken,
-              ...(telegramSecret ? { secretToken: telegramSecret } : {}),
-            }),
-          }
+        ? { telegram: createTelegramAdapter({ botToken: telegramToken }) }
         : {}),
     },
   };
