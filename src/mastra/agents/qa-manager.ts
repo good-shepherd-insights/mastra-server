@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { AgentId, DEFAULT_AGENT_MODEL } from '../config/index.js';
 import { buildChannelAdapters } from '../utils/adapters.js';
 import { sharedMemory } from '../memory/index.js';
-import { webSearchTool } from '../tools/index.js';
+import { webSearchTool, webExtractTool } from '../tools/index.js';
 import { instructions } from './instructions/qa-manager.js';
 
 export const qaManager = new Agent({
@@ -11,6 +11,6 @@ export const qaManager = new Agent({
   instructions,
   model: DEFAULT_AGENT_MODEL,
   memory: sharedMemory,
-  tools: { webSearchTool },
+  tools: { webSearchTool, webExtractTool },
   channels: buildChannelAdapters('QA_MANAGER', AgentId.QA_MANAGER),
 });
